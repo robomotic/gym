@@ -1,5 +1,14 @@
 from gym.envs.registration import registry, register, make, spec
 
+# Multiplayer
+# ---------
+
+register(
+    id='GoldMiner-v1',
+    entry_point='gym.envs.multiplayer:GoldMinerEnv'
+)
+
+
 # Algorithmic
 # ----------------------------------------
 

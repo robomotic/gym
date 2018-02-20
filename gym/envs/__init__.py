@@ -375,6 +375,14 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
             nondeterministic=nondeterministic,
         )
 
+# Multiplayer
+# ---------
+
+register(
+    id='GoldMiner-v1',
+    entry_point='gym.envs.multiplayer:GoldMinerEnv'
+)
+
 
 # Unit test
 # ---------

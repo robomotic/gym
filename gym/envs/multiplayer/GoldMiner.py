@@ -135,9 +135,6 @@ class GoldMinerEnv(Env):
                 new_position = 'Free'
             elif action == 'U':
                 new_position = 'Gold'
-                self._observation['Player%dHasGold' % playernumber] = 1
-                player_reward = 1.0
-                self._observation['GoldMine'] -= 1
             elif action == 'R':
                 new_position = 'HostileR'
 
@@ -164,12 +161,15 @@ class GoldMinerEnv(Env):
             if has_gold:
                 self._observation['GoldHome']+=1
                 self._observation['Player%dHasGold' % playernumber] = 0
-                player_reward += 1.0
+                player_reward = +1.0
 
         if new_position == 'Gold':
-            self._observation['Player%dHasGold' % playernumber] = 1
-            self._observation['GoldMine'] -= 1
-            player_reward = 1.0
+
+            if self._observation['Player%dHasGold' % playernumber] == 0:
+                self._observation['Player%dHasGold' % playernumber] = 1
+                self._observation['GoldMine'] -= 1
+
+                player_reward = +1.0
 
         if new_position =='HostileL' or new_position =='HostileR':
             # if the player is holding a gold unit
@@ -267,6 +267,8 @@ class GoldMinerEnv(Env):
         info['PreviousAction'] = '' if action is None else self._invActions[action]
         info['PlayerReward'] = reward
         info['GoldHome'] = self._observation['GoldHome']
+        info['GoldHostileR'] = self._observation['GoldHostileR']
+        info['GoldHostileL'] = self._observation['GoldHostileL']
 
         return info
 

@@ -40,6 +40,9 @@ class QLearn:
         else:
             raise Exception("Not implemented yet")
 
+    def seed(self,seed):
+        random.seed(seed)
+
     def getObsSize(self):
         '''
         Gets the total dimension of the observation space calculated at init

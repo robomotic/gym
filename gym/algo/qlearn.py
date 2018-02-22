@@ -8,19 +8,59 @@ Inspired by https://gym.openai.com/evaluations/eval_kWknKOkPQ7izrixdhriurA
 import gym
 import numpy
 import random
+from collections import OrderedDict
 
 class QLearn:
-    def __init__(self, actions, epsilon, alpha, gamma):
+    def __init__(self, observations, actions, epsilon, alpha, gamma):
+        '''
+        Initialize the Q-learning variables and do some space calculations
+        :param gym.spaces.Dict observations: gym space
+        :param spaces.Discrete actions: gym space
+        :param float epsilon: exploration constant
+        :param float alpha: discount constant
+        :param float gamma: discount factor
+        '''
         self.q = {}
         self.epsilon = epsilon  # exploration constant
         self.alpha = alpha      # discount constant
         self.gamma = gamma      # discount factor
-        self.actions = actions
+        self.total_actions = actions.n  # actions available
+        self.actions = range(actions.n) # action indexes
 
-    def dict2bin(self,dict_state):
+        if isinstance(observations,gym.spaces.Dict):
+            self.obs_space = {}
+            self.obs_space_size = 1
+            self.obs_space_index = {}
+            for idx, item in enumerate(observations.spaces.items()):
+                self.obs_space[item[0]] = item[1].n
+                self.obs_space_size *= item[1].n
+                self.obs_space_index[item[0]] = idx
 
-        pass
-    def bin2dict(self,bin_state):
+            self.obs_dims = len(observations.spaces.keys())
+        else:
+            raise Exception("Not implemented yet")
+
+    def getObsSize(self):
+        '''
+        Gets the total dimension of the observation space calculated at init
+        :return: the total number of states of the observations
+        :rtype: int
+        '''
+        return self.obs_space_size
+
+    def encodeState(self,dict_state):
+        '''
+        Encode the observation which is a dictionary in a simplified string
+        :param Dict dict_state: the observation dictionary
+        :return: a string representation of the dictionary
+        '''
+        ordered = {}
+        for key,index in self.obs_space_index.items():
+            ordered[index] = dict_state[key]
+
+        return ":".join(str(v) for k, v in sorted(ordered.items()))
+
+    def decodeState(self,state):
         pass
 
     def getQ(self, state, action):

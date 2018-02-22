@@ -14,29 +14,12 @@ class RandomAgent(object):
     def act(self, observation, reward, done):
         return self.action_space.sample()
 
-class ReplayAgent(object):
-    """This replays an optimal sequence of events"""
-    ACTIONS = ['L', 'U', 'R', 'D']
-
-    def __init__(self, action_space,playerno,memory=[]):
-        self.action_space = action_space
-        self.player_number = playerno
-        self.MEMORY = memory
-        self._actions = {value: i for i, value in enumerate(self.ACTIONS)}
-
-    def act(self, step):
-        if step >= 0 and step < len(self.MEMORY):
-            optimal_action = self.MEMORY[step]
-            return self._actions[optimal_action]
-        else:
-            raise Exception("out of sequence")
-
 
 def one_qlearning_player():
     from gym.algo.qlearn import QLearn
     import numpy
 
-    env = GoldMiner.GoldMinerEnv(players=1,totalgold=1,cooperative=False)
+    env = GoldMiner.GoldMinerEnv(players=1,totalgold=1,cooperative=False,maxsteps=12)
 
     # You provide the directory to write to (can be an existing
     # directory, including one with existing data -- all monitor files
@@ -45,49 +28,47 @@ def one_qlearning_player():
     outdir = '../multiagent/one-qlearn'
     env = wrappers.Monitor(env, directory=outdir, force=True)
 
-    number_of_features = env.observation_space.shape[0]
     last_time_steps = numpy.ndarray(0)
 
     # The Q-learn algorithm
-    qlearn = QLearn(actions=range(env.action_space.n),alpha=0.5, gamma=0.90, epsilon=0.1)
+    qlearn = QLearn(observations=env.observation_space,actions=env.action_space,alpha=0.5, gamma=0.90, epsilon=0.1)
+    space_size = qlearn.getObsSize()
+    print("State space cardinality is %d " % space_size)
+
     max_number_of_steps = 12
-    for i_episode in range(3000):
+    cumulated_reward = 0
+    for i_episode in range(space_size+1):
         observation = env.reset()
-        state = ''
-        for t in range(max_number_of_steps):
+        # Encode state to a compact string serialization
+        state = qlearn.encodeState(observation)
+        cumulated_reward = 0
+        # decay epsilon if necessary
+        qlearn.epsilon = qlearn.epsilon * 1.0
+        print("Episode {:d} ".format(i_episode))
+        for t in range(max_number_of_steps+1):
             # env.render()
 
             # Pick an action based on the current state
             action = qlearn.chooseAction(state)
+
             # Execute the action and get feedback
             observation, reward, done, info = env.step(action)
 
-            # Digitize the observation to get a state
-            nextState = ''
+            print("\tGame State Time {:d}: {:s}".format(t,str(info)))
 
-            # # If out of bounds
-            # if (cart_position > 2.4 or cart_position < -2.4):
-            #     reward = -200
-            #     qlearn.learn(state, action, reward, nextState)
-            #     print("Out of bounds, reseting")
-            #     break
+            # Encode next state as well
+            nextState = qlearn.encodeState(observation)
 
-            if not(done):
-                qlearn.learn(state, action, reward, nextState)
-                state = nextState
-            else:
-                # Q-learn stuff
-                reward = -200
-                qlearn.learn(state, action, reward, nextState)
+            qlearn.learn(state, action, reward, nextState)
+            state = nextState
+            cumulated_reward += reward
+
+            if done:
                 last_time_steps = numpy.append(last_time_steps, [int(t + 1)])
                 break
 
-    l = last_time_steps.tolist()
-    l.sort()
-    print("Overall score: {:0.2f}".format(last_time_steps.mean()))
-    print("Best 100 score: {:0.2f}".format(reduce(lambda x, y: x + y, l[-100:]) / len(l[-100:])))
+        print("Episode {:d} reward score: {:0.2f}".format(i_episode, cumulated_reward))
 
-    env.monitor.close()
 
 def one_random_player():
     env = GoldMiner.GoldMinerEnv(players=1,totalgold=2,cooperative=False)
@@ -175,7 +156,7 @@ def two_random_compete_player():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=None)
-    parser.add_argument('env_id', nargs='?', default='CartPole-v0', help='Select the environment to run')
+    parser.add_argument('env_id', nargs='?', default='GoldMiner-v0', help='Select the environment to run')
     args = parser.parse_args()
 
     # You can set the level to logger.DEBUG or logger.WARN if you
@@ -183,7 +164,4 @@ if __name__ == '__main__':
     logger.set_level(logger.WARN)
 
     # Play first a one random player
-    #one_random_player()
-    #one_optimal_player()
-    one_debug()
-    #one_qlearning_player()
+    one_qlearning_player()

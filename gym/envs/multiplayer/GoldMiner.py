@@ -21,16 +21,24 @@ class GoldMinerEnv(Env):
     ACTIONS = ['L', 'U', 'R', 'D']
     POSITIONS = ['Home', 'Free', 'HostileL', 'HostileR', 'Gold']
 
-    def __init__(self, players=1,totalgold= 1,cooperative = False):
+    def __init__(self, players=1,totalgold= 1,cooperative = False,maxsteps=100):
 
-        # load the dashboard template
-        self.action_space = spaces.Discrete(len(self.ACTIONS))
+        # count the steps so far
+        self.steps = 0
+        # terminate when this count is reached
+        self.maxsteps = maxsteps
 
+        # set the path directory to load the state representation
         dir_path = os.path.dirname(os.path.realpath(__file__))
 
+        # set the possible actions
+        self.action_space = spaces.Discrete(len(self.ACTIONS))
+
         with open(os.path.join(dir_path,'board.txt'), 'r') as board_file:
+            # read the ASCII art
             self._ascii_grid = board_file.read()
 
+        # the total number of players
         self.players = players
 
         self._positions = {value:i for i,value in enumerate(self.POSITIONS)}
@@ -43,27 +51,21 @@ class GoldMinerEnv(Env):
 
         self.cooperative = cooperative
 
-        if players == 1:
-            self.observation_space = spaces.Dict({"Player1Position": spaces.Discrete(len(self.POSITIONS)),
-                                                  'Player1HasGold':spaces.Discrete(2),
-                                                  'GoldHostileL':spaces.Discrete(2),
-                                                  'GoldHostileR': spaces.Discrete(2),
-                                                  'GoldMine': spaces.Discrete(totalgold),
-                                                  'GoldHome':spaces.Discrete(totalgold)})
-            self.active_player = 1
-        elif players == 2:
-            self.observation_space = spaces.Dict({"Player1Position": spaces.Discrete(len(self.POSITIONS)),
-                                                  'Player1HasGold':spaces.Discrete(2),
-                                                  "Player2Position": spaces.Discrete(len(self.POSITIONS)),
-                                                  'Player2HasGold': spaces.Discrete(2),
-                                                  'GoldHostileL':spaces.Discrete(2),
-                                                  'GoldHostileR': spaces.Discrete(2),
-                                                  'GoldMine': spaces.Discrete(totalgold),
-                                                  'GoldHome':spaces.Discrete(totalgold)})
-            self.active_player = 1
-        else:
-            raise Exception("Only two players supported for now!")
+        global_space = {'GoldHostileL':spaces.Discrete(2),
+                        'GoldHostileR': spaces.Discrete(2),
+                        'GoldMine': spaces.Discrete(totalgold+1),
+                        'GoldHome':spaces.Discrete(totalgold+1)}
 
+        for number in range(1,players+1):
+            player_space = {"Player%dPosition" % number: spaces.Discrete(len(self.POSITIONS)),'Player1HasGold':spaces.Discrete(2)}
+            global_space= {**global_space,**player_space}
+
+        # build the observation space from the global and players's state
+        self.observation_space = spaces.Dict(global_space)
+
+        # the player's turn to move
+        self.active_player = 1
+        # keeps track of each player state visits
         self._visited = {}
         self.seed()
         self.reset()
@@ -73,11 +75,15 @@ class GoldMinerEnv(Env):
         return [seed]
 
     def reset(self):
-
+        '''
+        Reset the environment
+        :return: the initial observation state
+        '''
+        self.steps = 0
         for id in range(1,self._players+1):
             self._observation['Player%dPosition' % id] = self._positions[self.POSITIONS[0]]
             self._observation['Player%dHasGold' %id] = 0
-            self._observation['GoldMine'] = self._totalgold-1
+            self._observation['GoldMine'] = self._totalgold
             self._observation['GoldHostileL'] = 0
             self._observation['GoldHostileR'] = 0
             self._observation['GoldHome'] = 0
@@ -212,15 +218,15 @@ class GoldMinerEnv(Env):
 
 
     def _check_terminate(self):
-        player_ends = 0
 
         # if we moved all the gold from the mine to home then it ends
-        if self._observation['GoldHome'] == self._totalgold:
+        if self._observation['GoldHome'] == self._totalgold or self.steps >= self.maxsteps:
             return True
         else:
             return False
 
         # # TODO: too restrictive, terminate after visiting all positions
+        # player_ends = 0
         # for playernumber in range(1, self._players + 1):
         #
         #     if len(self._visited['Player%d' % playernumber]) == len(self.POSITIONS):
@@ -284,6 +290,9 @@ class GoldMinerEnv(Env):
 
         info = self._get_info(action,reward)
         self._lastReward = reward
+
+        self.steps += 1
+
         return self._observation, reward, done, info
 
     def get_last_info(self):

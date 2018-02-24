@@ -7,15 +7,8 @@ from gym.envs.multiplayer import GoldMiner
 
 import pprint
 
-class RandomAgent(object):
-    """The world's simplest agent!"""
-    def __init__(self, action_space,playerno):
-        self.action_space = action_space
-        self.player_number = playerno
-
-    def act(self, observation, reward, done):
-        return self.action_space.sample()
-
+def optimize_one_qlearning_player():
+    pass
 
 def one_qlearning_player():
     from gym.algo.qlearn import QLearn
@@ -24,7 +17,7 @@ def one_qlearning_player():
 
     max_steps = 18
 
-    env = GoldMiner.GoldMinerEnv(players=1,totalgold=1,cooperative=False,maxsteps=max_steps)
+    env = GoldMiner.GoldMinerEnv(players=1,totalgold=1,maxsteps=max_steps)
 
     # You provide the directory to write to (can be an existing
     # directory, including one with existing data -- all monitor files
@@ -95,90 +88,6 @@ def one_qlearning_player():
 
     for bin in histogram:
         print("Total episodes = {:d} with reward = {:f}".format(histogram[bin],bin))
-
-    # Close the env and write monitor result info to disk
-    env.close()
-
-def one_random_player():
-    env = GoldMiner.GoldMinerEnv(players=1,totalgold=2,cooperative=False)
-
-    # You provide the directory to write to (can be an existing
-    # directory, including one with existing data -- all monitor files
-    # will be namespaced). You can also dump to a tempdir if you'd
-    # like: tempfile.mkdtemp().
-    outdir = '../multiagent/one-random'
-    env = wrappers.Monitor(env, directory=outdir, force=True)
-    env.seed(5)
-    agent1 = RandomAgent(env.action_space,1)
-    episode_count = 1
-    reward = 0
-    done = False
-
-
-    for i in range(episode_count):
-        ob = env.reset()
-        total_reward = 0
-        steps = 0
-        while steps < 24:
-            action = agent1.act(ob, reward, done)
-            ob, reward, done, info = env.step(action)
-            total_reward += reward
-            logger.warn('Game info %s : ' % info)
-            if done:
-                break
-            steps+=1
-            # Note there's no env.render() here. But the environment still can open window and
-            # render if asked by env.monitor: it calls env.render('rgb_array') to record video.
-            # Video is not recorded every episode, see capped_cubic_video_schedule for details.
-        logger.warn("Total reward in episode %d with %d steps is %d " % (i,steps,total_reward) )
-    # Close the env and write monitor result info to disk
-    env.close()
-
-
-def two_random_compete_player():
-    env = GoldMiner.GoldMinerEnv(players=2,totalgold=2,cooperative=False)
-
-    # You provide the directory to write to (can be an existing
-    # directory, including one with existing data -- all monitor files
-    # will be namespaced). You can also dump to a tempdir if you'd
-    # like: tempfile.mkdtemp().
-    outdir = '../multiagent/two-random'
-    env = wrappers.Monitor(env, directory=outdir, force=True)
-    env.seed(0)
-
-    agent1 = RandomAgent(env.action_space,1)
-    agent2 = RandomAgent(env.action_space,2)
-
-    episode_count = 1
-
-    reward1 = 0
-    done1 = False
-
-    reward1 = 0
-    done2 = False
-
-    for i in range(episode_count):
-        ob = env.reset()
-
-        while True:
-
-            if done1 == False:
-                env.select_player(agent1.player_number)
-
-                action = agent1.act(ob, reward1, done1)
-                ob, reward1, done1, _ = env.step(action)
-
-            if done2 == False:
-                env.select_player(agent2.player_number)
-
-                action = agent2.act(ob, reward2, done2)
-                ob, reward2, done2, _ = env.step(action)
-
-            if done1 and done2:
-                break
-            # Note there's no env.render() here. But the environment still can open window and
-            # render if asked by env.monitor: it calls env.render('rgb_array') to record video.
-            # Video is not recorded every episode, see capped_cubic_video_schedule for details.
 
     # Close the env and write monitor result info to disk
     env.close()

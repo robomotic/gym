@@ -21,7 +21,7 @@ class GoldMinerEnv(Env):
     ACTIONS = ['L', 'U', 'R', 'D']
     POSITIONS = ['Home', 'Free', 'HostileL', 'HostileR', 'Gold']
 
-    def __init__(self, players=1,totalgold= 1,cooperative = False,maxsteps=100):
+    def __init__(self, players=1,totalgold= 1,maxsteps=100):
 
         # count the steps so far
         self.steps = 0
@@ -48,8 +48,6 @@ class GoldMinerEnv(Env):
         self._totalgold = totalgold
         self._players = players
         self._observation = {}
-
-        self.cooperative = cooperative
 
         global_space = {'GoldHostileL':spaces.Discrete(2),
                         'GoldHostileR': spaces.Discrete(2),
@@ -95,8 +93,6 @@ class GoldMinerEnv(Env):
         return self._observation
 
     def _move_players(self,action_index):
-
-        self._players_reward = []
 
         action = self.ACTIONS[action_index]
 
@@ -214,7 +210,7 @@ class GoldMinerEnv(Env):
 
         self._visited['Player%d' % playernumber].add( self._positions[new_position] )
 
-        self._players_reward.append(player_reward)
+        self._players_reward = player_reward
 
 
     def _check_terminate(self):
@@ -247,8 +243,8 @@ class GoldMinerEnv(Env):
 
     def select_player(self,playerid):
 
-        assert self.playerid <= self._players
-        assert self.playerid >= 1
+        assert playerid <= self._players
+        assert playerid >= 1
 
         self.active_player = playerid
 
@@ -278,12 +274,7 @@ class GoldMinerEnv(Env):
 
         self._move_players(action)
 
-        rewards = self._get_reward()
-
-        if self.cooperative:
-            reward = sum(rewards)
-        else:
-            reward = rewards[self.active_player-1]
+        reward = self._get_reward()
 
         if self._check_terminate():
             done = 1

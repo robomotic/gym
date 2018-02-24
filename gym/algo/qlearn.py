@@ -1,15 +1,9 @@
 '''
-Q-learning approach for different RL problems
-as part of the basic series on reinforcement learning @
-https://github.com/vmayoral/basic_reinforcement_learning
-Inspired by https://gym.openai.com/evaluations/eval_kWknKOkPQ7izrixdhriurA
-        @author: Victor Mayoral Vilches <victor@erlerobotics.com>
+Basic tabular Q-learning class
 '''
 import gym
-import numpy
 import random
-from collections import OrderedDict
-
+import pandas as pd
 class QLearn:
     def __init__(self, observations, actions, epsilon, alpha, gamma):
         '''
@@ -31,11 +25,12 @@ class QLearn:
             self.obs_space = {}
             self.obs_space_size = 1
             self.obs_space_index = {}
+            self.obs_space_rindex = {}
             for idx, item in enumerate(observations.spaces.items()):
                 self.obs_space[item[0]] = item[1].n
                 self.obs_space_size *= item[1].n
                 self.obs_space_index[item[0]] = idx
-
+                self.obs_space_rindex[idx] = item[0]
             self.obs_dims = len(observations.spaces.keys())
         else:
             raise Exception("Not implemented yet")
@@ -56,6 +51,7 @@ class QLearn:
         Encode the observation which is a dictionary in a simplified string
         :param Dict dict_state: the observation dictionary
         :return: a string representation of the dictionary
+        :rtype: str
         '''
         ordered = {}
         for key,index in self.obs_space_index.items():
@@ -64,9 +60,40 @@ class QLearn:
         return ":".join(str(v) for k, v in sorted(ordered.items()))
 
     def decodeState(self,state):
-        pass
+        '''
+        Decode into the original observation from the simplified string
+        :param str state: the string
+        :return: the observation
+        :rtype: dict
+        '''
+        values = state.split(':')
+        obs = {}
+        if len(values)==0:
+            raise Exception('Wrong format')
+        else:
+            for index,value in enumerate(values):
+                obs[self.obs_space_rindex[index]] = value
+
+        return obs
+
+    def exportToPandas(self):
+        rows = []
+        for state_action,value in self.q.items():
+            row = self.decodeState(state_action[0])
+            row['action'] = state_action[1]
+            row['value'] = value
+            rows.append(row)
+
+        return pd.DataFrame(rows)
 
     def getQ(self, state, action):
+        '''
+        Return the value associated with the state-action pair
+        :param state: an encoded gym state
+        :param action: an integer from discrete gym state
+        :return: the value
+        :rtype: float
+        '''
         return self.q.get((state, action), 0.0)
 
     def learnQ(self, state, action, reward, value):
@@ -81,6 +108,12 @@ class QLearn:
             self.q[(state, action)] = oldv + self.alpha * (value - oldv)
 
     def chooseAction(self, state, return_q=False):
+        '''
+        Choose the best action
+        :param state: an integer from the gym discrete space
+        :param return_q: if True returns also the value, if False only the action
+        :return: the action and or the value of the state
+        '''
         q = [self.getQ(state, a) for a in self.actions]
         maxQ = max(q)
 

@@ -12,6 +12,20 @@ import multiprocessing
 from gym.algo.qlearn import QLearn
 from collections import Counter,deque
 import os
+from PIL import Image
+
+def test_graphic():
+    from gym.envs.classic_control import rendering
+    screen_width = 600
+    screen_height = 400
+
+    viewer = rendering.Viewer(screen_width, screen_height)
+
+    gamepic = viewer.render(True)
+    print(gamepic.shape)
+    img = Image.fromarray(gamepic, 'RGB')
+    img.save('my.png')
+    img.show()
 
 def evaluate_qlearning(args):
     index, params = args
@@ -97,7 +111,7 @@ def one_qlearning_player():
     env = GoldMiner.GoldMinerEnv(players=1,totalgold=1,maxsteps=max_steps)
 
     outdir = '../multiagent/one-qlearn'
-    env = wrappers.Monitor(env, directory=outdir, force=True)
+    monitor = wrappers.Monitor(env, directory=outdir, force=True)
 
     last_time_steps = np.ndarray(0)
 
@@ -118,7 +132,7 @@ def one_qlearning_player():
     episode_reward = []
 
     for i_episode in range(space_size*2):
-        observation = env.reset()
+        observation = monitor.reset()
         # Encode state to a compact string serialization
         state = qlearn.encodeState(observation)
         cumulated_reward = 0
@@ -129,13 +143,12 @@ def one_qlearning_player():
             print("Episode {:d} ".format(i_episode))
 
         for t in range(max_steps+1):
-            # env.render()
 
             # Pick an action based on the current state
             action = qlearn.chooseAction(state)
 
             # Execute the action and get feedback
-            observation, reward, done, info = env.step(action)
+            observation, reward, done, info = monitor.step(action)
 
             # Encode next state as well
             nextState = qlearn.encodeState(observation)
@@ -161,14 +174,32 @@ def one_qlearning_player():
 
     for bin in histogram:
         print("Total episodes = {:d} with reward = {:f}".format(histogram[bin],bin))
+    # Export the Q table as panda frame
+    qdf = qlearn.exportToPandas()
+    # Replace state and actions
+    qdf['action']=qdf['action'].map(lambda idx:env.ACTIONS[idx])
+    qdf['Player1Position'] = qdf['Player1Position'].map(lambda idx: env.POSITIONS[int(idx)])
 
+    qdf = qdf.loc[qdf['value'] > 0.0]
+
+    # Save as HTML table
+    #dphtml = qdf.style
+    dphtml = qdf.to_html()
+
+    with open('qtable.html', 'w') as f:
+        f.write(dphtml)
+        f.close()
+
+    pivot1 = qdf.pivot_table(qdf, index=["Player1Position", "action","Player1HasGold","GoldHome"])
+    pivot1.to_html("qpivot.html")
     # Close the env and write monitor result info to disk
-    env.close()
+    monitor.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=None)
     parser.add_argument('--optimize', dest='optimize', action='store_true')
-    parser.add_argument('--best', dest='best', action='store_true',default = True)
+    parser.add_argument('--best', dest='best', action='store_true',default = False)
+    parser.add_argument('--grafix', dest='ui', action='store_true', default = False)
     args = parser.parse_args()
 
     # You can set the level to logger.DEBUG or logger.WARN if you
@@ -181,6 +212,8 @@ if __name__ == '__main__':
     elif args.optimize:
         # Parameter search for optimal Q-learning player
         optimize_one_qlearning_player()
+    elif args.ui:
+        test_graphic()
     else:
         args.print_help()
         sys.exit(1)

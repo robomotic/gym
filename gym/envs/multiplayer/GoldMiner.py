@@ -16,7 +16,8 @@ class GoldMinerEnv(Env):
 
     """
 
-    metadata = {'render.modes': ['human', 'ansi']}
+    metadata = {'render.modes': ['human', 'ansi','rgb_array'],
+                'video.frames_per_second' : 1}
 
     ACTIONS = ['L', 'U', 'R', 'D']
     POSITIONS = ['Home', 'Free', 'HostileL', 'HostileR', 'Gold']
@@ -67,6 +68,8 @@ class GoldMinerEnv(Env):
         self._visited = {}
         self.seed()
         self.reset()
+
+        self.viewer = None
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -296,13 +299,80 @@ class GoldMinerEnv(Env):
 
         return self._observation
 
+    def _draw_rgb(self):
+
+        gold_xy = (0.0, 3.0)
+        home_xy = (0.0, -3.0)
+        free_xy = (0.0, -1.0)
+        hostile_lxy = (-1.0, 1.0)
+        hostile_rxy = (1.0, 1.0)
+
+        locations = [home_xy,free_xy,hostile_lxy,hostile_rxy,gold_xy]
+        transitions = [(home_xy,free_xy),(free_xy,hostile_lxy),(free_xy,hostile_rxy),(hostile_rxy,gold_xy),(hostile_lxy,gold_xy)]
+        red = (1.0,0.0,0.0)
+        green = (.0,1.0,.0)
+        blue = (.0, .0, 1.0)
+        gold = (1.0,1.0,0.0)
+        colors = [blue,green,red,red,gold]
+        space_radius = 0.4
+
+        if self.viewer is None:
+            from gym.envs.classic_control import rendering
+            screen_width = 400
+            screen_height = 800
+
+            self.viewer = rendering.Viewer(screen_width, screen_height)
+            self.viewer.set_bounds(-2.0, 2.0, -4.0, 4.0)
+
+            for i,connect in enumerate(transitions):
+                line = rendering.make_line(connect[0],connect[1])
+                line.set_linewidth(10)
+                self.viewer.add_geom(line)
+
+            for i,location in enumerate(locations):
+                color = colors[i]
+                place = rendering.make_circle(space_radius)
+                place.set_color(color[0],color[1],color[2])
+                place_pos = rendering.Transform(translation=location)
+                place.add_attr(place_pos)
+                self.viewer.add_geom(place)
+
+        self.viewer.remove_labels()
+
+        for id in range(1,self._players+1):
+            pos_index = self._observation['Player%dPosition' % id]
+            location_xy = locations[pos_index]
+            if id == 1:
+                print_xy = (location_xy[0] + 0.2,location_xy[1])
+            if id == 2:
+                print_xy = (location_xy[0] - 0.2, location_xy[1])
+
+            self.viewer.draw_label(text='P1', position=print_xy)
+
+        self.viewer.draw_label(text='Gold Home = %d' % self._observation['GoldHome'], position=(-1.2, -3.5),font_size=14)
+        self.viewer.draw_label(text='Gold Mine = %d' % self._observation['GoldMine'], position=(-1.2,3.5),font_size=14)
+
+        if self._observation['GoldHostileL']:
+            self.viewer.draw_label(text='Gold = 1', position=(-1.5, 0.6),font_size=14)
+
+        if self._observation['GoldHostileR']:
+            self.viewer.draw_label(text='Gold = 1', position=(1.5, 0.6),font_size=14)
 
     def render(self, mode='human'):
-        outfile = StringIO() if mode == 'ansi' else sys.stdout
 
-        #desc[row][col] = utils.colorize(desc[row][col], "red", highlight=True)
-
-        outfile.write(self._ascii_grid)
-
-        if mode != 'human':
+        if mode == 'ansi':
+            outfile = StringIO()
+            outfile.write(self._ascii_grid)
             return outfile
+        elif mode =='human':
+            outfile = sys.stdout
+            outfile.write(self._ascii_grid)
+        elif mode == 'rgb_array':
+            if len(self._observation) == 0:
+                return None
+            else:
+                self._draw_rgb()
+                return self.viewer.render(True)
+
+    def close(self):
+        if self.viewer: self.viewer.close()

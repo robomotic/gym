@@ -16,15 +16,77 @@ from PIL import Image
 
 def test_graphic():
     from gym.envs.classic_control import rendering
-    screen_width = 600
-    screen_height = 400
+    screen_width = 400
+    screen_height = 800
 
     viewer = rendering.Viewer(screen_width, screen_height)
+    viewer.set_bounds(-2.0, 2.0, -4.0, 4.0)
 
+    gold_xy =(0.0,3.0)
+    home_xy = (0.0,-3.0)
+    free_xy = (0.0,-1.0)
+    hostile_lxy = (-1.0,1.0)
+    hostile_rxy = (1.0,1.0)
+
+    gold_transform = rendering.Transform(rotation=0, translation=gold_xy)
+    circ = viewer.draw_circle(0.4)
+    circ.set_color(1.0, 1.0, 0)
+    circ.add_attr(gold_transform)
+
+    line_gold_hostiler = viewer.draw_line(start=gold_xy,end=hostile_rxy)
+    line_gold_hostiler.set_color(1.0,0.0,0.0)
+    line_gold_hostiler.add_attr(rendering.LineWidth(10))
+
+    line_gold_hostilel = viewer.draw_line(start=gold_xy,end=hostile_lxy)
+    line_gold_hostilel.set_color(1.0,0.0,0.0)
+    line_gold_hostilel.add_attr(rendering.LineWidth(10))
+
+    home_transform = rendering.Transform(rotation=0, translation=home_xy)
+    circ = viewer.draw_circle(0.4)
+    circ.set_color(.0, .0, 1.0)
+    circ.add_attr(home_transform)
+
+    free_transform = rendering.Transform(rotation=0, translation=free_xy)
+    circ = viewer.draw_circle(0.4)
+    circ.set_color(.0, 1.0, 0.0)
+    circ.add_attr(free_transform)
+
+    line_home_free = viewer.draw_line(start=home_xy,end=free_xy)
+    line_home_free.set_color(1.0,0.0,0.0)
+    line_home_free.add_attr(rendering.LineWidth(10))
+
+    hostile_ltransform = rendering.Transform(rotation=0, translation=hostile_lxy)
+    circ = viewer.draw_circle(0.4)
+    circ.set_color(1.0, .0, .0)
+    circ.add_attr(hostile_ltransform)
+
+    line_free_hostilel = viewer.draw_line(start=free_xy,end=hostile_lxy)
+    line_free_hostilel.set_color(1.0,0.0,0.0)
+    line_free_hostilel.add_attr(rendering.LineWidth(10))
+
+    hostile_rtransform = rendering.Transform(rotation=0, translation=hostile_rxy)
+    circ = viewer.draw_circle(0.4)
+    circ.set_color(1.0, .0, .0)
+    circ.add_attr(hostile_rtransform)
+
+    line_free_hostiler = viewer.draw_line(start=free_xy,end=hostile_rxy)
+    line_free_hostiler.set_color(1.0,0.0,0.0)
+    line_free_hostiler.add_attr(rendering.LineWidth(10))
+
+    # draw player 1 for example
+
+    player_circle = rendering.Transform(rotation=0, translation=(0.15,3.0))
+    circ = viewer.draw_circle(0.2)
+    circ.set_color(1.0, 1.0, 1.0)
+    circ.add_attr(player_circle)
+
+    viewer.draw_label(text='P1',position=home_xy)
+    viewer.draw_label(text='P2', position=hostile_lxy)
+    viewer.draw_label(text='Gold = 3', position=(-1.8,3.8))
     gamepic = viewer.render(True)
-    print(gamepic.shape)
+
     img = Image.fromarray(gamepic, 'RGB')
-    img.save('my.png')
+    img.save('goldminergame.png')
     img.show()
 
 def evaluate_qlearning(args):

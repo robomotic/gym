@@ -52,6 +52,7 @@ class Viewer(object):
         self.window.on_close = self.window_closed_by_user
         self.isopen = True
         self.geoms = []
+        self.labels = []
         self.onetime_geoms = []
         self.transform = Transform()
 
@@ -66,17 +67,25 @@ class Viewer(object):
 
     def set_bounds(self, left, right, bottom, top):
         assert right > left and top > bottom
-        scalex = self.width/(right-left)
-        scaley = self.height/(top-bottom)
+        self.scalex = self.width/(right-left)
+        self.scaley = self.height/(top-bottom)
         self.transform = Transform(
-            translation=(-left*scalex, -bottom*scaley),
-            scale=(scalex, scaley))
+            translation=(-left*self.scalex, -bottom*self.scaley),
+            scale=(self.scalex, self.scaley))
 
     def add_geom(self, geom):
         self.geoms.append(geom)
 
     def add_onetime(self, geom):
         self.onetime_geoms.append(geom)
+
+    def add_label(self,label):
+        self.labels.append(label)
+
+    def remove_labels(self):
+        for label in self.labels:
+            label.delete()
+        self.labels = []
 
     def render(self, return_rgb_array=False):
         glClearColor(1,1,1,1)
@@ -88,7 +97,12 @@ class Viewer(object):
             geom.render()
         for geom in self.onetime_geoms:
             geom.render()
+
         self.transform.disable()
+
+        for label in self.labels:
+            label.draw()
+
         arr = None
         if return_rgb_array:
             buffer = pyglet.image.get_buffer_manager().get_color_buffer()
@@ -107,6 +121,12 @@ class Viewer(object):
         return arr if return_rgb_array else self.isopen
 
     # Convenience
+    def draw_label(self,text,position,color=(0,0,0,255),font_size=20):
+        label = pyglet.text.Label(text, font_name='Times New Roman', font_size=font_size,
+          x=position[0]*self.scalex+self.width/2, y=position[1]*self.scaley+self.height/2, anchor_x='center', anchor_y='center',color=color)
+        self.add_label(label)
+        return label
+
     def draw_circle(self, radius=10, res=30, filled=True, **attrs):
         geom = make_circle(radius=radius, res=res, filled=filled)
         _add_attrs(geom, attrs)
@@ -248,6 +268,9 @@ def make_polygon(v, filled=True):
 def make_polyline(v):
     return PolyLine(v, False)
 
+def make_line(start,end):
+    return Line(start,end)
+
 def make_capsule(length, width):
     l, r, t, b = 0, length, width/2, -width/2
     box = make_polygon([(l,b), (l,t), (r,t), (r,b)])
@@ -256,6 +279,12 @@ def make_capsule(length, width):
     circ1.add_attr(Transform(translation=(length, 0)))
     geom = Compound([box, circ0, circ1])
     return geom
+
+def make_label(self,text,position,color=(0,0,0,255)):
+    label = pyglet.text.Label(text, font_name='Times New Roman', font_size=20,
+      x=position[0]*self.scalex+self.width/2, y=position[1]*self.scaley+self.height/2, anchor_x='center', anchor_y='center',color=color)
+
+    return label
 
 class Compound(Geom):
     def __init__(self, gs):
@@ -289,6 +318,9 @@ class Line(Geom):
         self.end = end
         self.linewidth = LineWidth(1)
         self.add_attr(self.linewidth)
+
+    def set_linewidth(self, x):
+        self.linewidth.stroke = x
 
     def render1(self):
         glBegin(GL_LINES)

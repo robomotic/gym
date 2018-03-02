@@ -5,6 +5,7 @@ import gym
 import random
 import pandas as pd
 import numpy as np
+
 class QLearn:
     def __init__(self, observations, actions, epsilon, alpha, gamma ,epsgreedy= True, tstart = 1000):
         '''
@@ -42,8 +43,24 @@ class QLearn:
         else:
             raise Exception("Not implemented yet")
 
+        self.glie = False
+
+    def enableGLIE(self):
+        '''
+            Greedy in the Limit with Infinite Exploration
+        :return:
+        '''
+        self.glie = True
+        self.obs_space_visits = {}
+
     def setTau(self,tstart):
+        '''
+            Set the initial temperature for the Softmax exploration algorithm
+        :param float tstart: the initial temperature parameter
+        :return: void
+        '''
         self.temperature = 1.0 * tstart
+
     def seed(self,seed):
         random.seed(seed)
 
@@ -94,6 +111,9 @@ class QLearn:
             rows.append(row)
 
         return pd.DataFrame(rows)
+
+    def loadQ(self,dict):
+        self.q = dict
 
     def getQ(self, state, action):
         '''

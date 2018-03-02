@@ -14,6 +14,7 @@ from collections import Counter,deque
 import os
 from PIL import Image
 import json
+import pickle
 
 def test_graphic():
     from gym.envs.classic_control import rendering
@@ -193,10 +194,11 @@ def evaluate_qlearning_softmax(args):
 
 def optimize_one_qlearning_player(epsgreedy=True):
 
-    folder = os.path.dirname(os.path.realpath(__file__))
-    folder = os.path.join(folder,'parameters')
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+    folder_data = os.path.dirname(os.path.realpath(__file__))
+    folder_data = os.path.join(folder_data,'parameters')
+
+    if not os.path.exists(folder_data):
+        os.makedirs(folder_data)
 
     if epsgreedy:
         grid_params = {
@@ -228,12 +230,12 @@ def optimize_one_qlearning_player(epsgreedy=True):
 
     print('Execution time: {} sec'.format(time.time() - start_time))
 
-    with open(os.path.join(folder,'epsgreedy.json' if epsgreedy else 'softmax.json'), 'w') as fp:
+    with open(os.path.join(folder_data,'epsgreedy.json' if epsgreedy else 'softmax.json'), 'w') as fp:
         summary = {'best':grid[np.argmax(final_scores)],'score':np.max(final_scores)}
         json.dump(summary, fp)
 
 
-def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
+def one_qlearning_player(epsgreedy=True,max_episodes = 100000,render=True):
     '''
     Load the best parameters and run the agent
     :return: None
@@ -261,14 +263,23 @@ def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
         qlearn = QLearn(observations=env.observation_space, actions=env.action_space, alpha=best['alpha'], gamma=best['gamma'],
                         epsilon=best['epsilon'])
 
+    if render == True:
+        with open(os.path.join(folder,'qtable-%s.dat' % 'epsgreedy' if epsgreedy else 'softmax'), 'rb') as handle:
+            qtable = pickle.load(handle)
+            qlearn.loadQ(qtable)
+
     outdir = '../multiagent/one-qlearn'
     monitor = wrappers.Monitor(env, directory=outdir, force=True)
 
     last_time_steps = np.ndarray(0)
 
-    # make deterministic both environment and agent
-    env.seed(0)
-    qlearn.seed(0)
+    if render:
+        # with this parameters the agent takes 2.0 at home
+        env.seed(0)
+        qlearn.seed(0)
+        # with these parameters the agent get shot and takes 2.0
+        env.seed(3)
+        qlearn.seed(3)
 
     space_size = qlearn.getObsSize()
 
@@ -305,7 +316,9 @@ def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
             # Encode next state as well
             nextState = qlearn.encodeState(observation)
 
-            qlearn.learn(state, action, reward, nextState)
+            if render == False:
+                qlearn.learn(state, action, reward, nextState)
+
             state = nextState
             cumulated_reward += reward
 
@@ -321,31 +334,38 @@ def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
 
         print("Episode {:d} reward score: {:0.2f}".format(i_episode, cumulated_reward))
 
-    env.close()
+    if render == False:
+        with open(os.path.join(folder,'qtable-%s.dat' % 'epsgreedy' if epsgreedy else 'softmax'), 'wb') as handle:
+            pickle.dump(qlearn.q, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
     # display simple histogram count
     histogram = Counter(episode_reward)
 
     for bin in histogram:
         print("Total episodes = {:d} with reward = {:f}".format(histogram[bin],bin))
-    # Export the Q table as panda frame
-    qdf = qlearn.exportToPandas()
-    # Replace state and actions
-    qdf['action']=qdf['action'].map(lambda idx:env.ACTIONS[idx])
-    qdf['Player1Position'] = qdf['Player1Position'].map(lambda idx: env.POSITIONS[int(idx)])
 
-    qdf = qdf.loc[qdf['value'] > 0.0]
+    if render == False:
+        # Export the Q table as panda frame
+        qdf = qlearn.exportToPandas()
+        # Replace state and actions
+        qdf['action']=qdf['action'].map(lambda idx:env.ACTIONS[idx])
+        qdf['Player1Position'] = qdf['Player1Position'].map(lambda idx: env.POSITIONS[int(idx)])
 
-    # Save as HTML table
-    #dphtml = qdf.style
-    dphtml = qdf.to_html()
+        qdf = qdf.loc[qdf['value'] > 0.0]
 
-    with open('qtable.html', 'w') as f:
-        f.write(dphtml)
-        f.close()
+        # Save as HTML table
+        #dphtml = qdf.style
+        dphtml = qdf.to_html()
 
-    pivot1 = qdf.pivot_table(qdf, index=["Player1Position", "action","Player1HasGold","GoldHome"])
-    pivot1.to_html("qpivot.html")
+        with open(os.path.join(folder,'qtable-%s.html' % 'epsgreedy' if epsgreedy else 'softmax'), 'w') as f:
+            f.write(dphtml)
+            f.close()
+
+        pivot1 = qdf.pivot_table(qdf, index=["Player1Position", "action","Player1HasGold","GoldHome"])
+        pivot1.to_html(os.path.join(folder,'qpivot-%s.html' % 'epsgreedy' if epsgreedy else 'softmax'))
+
     # Close the env and write monitor result info to disk
+    env.close()
     monitor.close()
 
 if __name__ == '__main__':
@@ -365,7 +385,7 @@ if __name__ == '__main__':
         if args.ui:
             one_qlearning_player(epsgreedy=args.epson,max_episodes=1,render = args.ui)
         else:
-            one_qlearning_player(epsgreedy=args.epson)
+            one_qlearning_player(epsgreedy=args.epson,render = False)
     elif args.optimize:
         # Parameter search for optimal Q-learning player
         optimize_one_qlearning_player(args.epson)

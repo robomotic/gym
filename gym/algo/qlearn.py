@@ -157,7 +157,16 @@ class QLearn:
         if self.epsgreedy:
             maxQ = max(q)
 
-            if random.random() < self.epsilon:
+            if self.glie:
+                # reduce probability if GLIE is enabled
+                if state in self.obs_space_visits:
+                    maxp = self.epsilon / self.obs_space_visits[state]
+                else:
+                    maxp = self.epsilon
+            else:
+                maxp = self.epsilon
+
+            if random.random() < maxp:
                 minQ = min(q);
                 # magnitude as absolute difference between min and max Q
                 mag = max(abs(minQ), abs(maxQ))
@@ -175,6 +184,14 @@ class QLearn:
                 i = q.index(maxQ)
 
             action = self.actions[i]
+
+            #update state visits if necessary
+            if self.glie:
+                if state in self.obs_space_visits:
+                    self.obs_space_visits[state] += 1
+                else:
+                    self.obs_space_visits[state] = 1
+
             if return_q: # if they want it, give it!
                 return action, q
             return action

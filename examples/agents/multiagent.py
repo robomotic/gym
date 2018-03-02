@@ -10,7 +10,7 @@ from sklearn.model_selection import ParameterGrid
 import time
 import multiprocessing
 from gym.algo.qlearn import QLearn
-from collections import Counter,deque
+from collections import Counter
 import os
 from PIL import Image
 import json

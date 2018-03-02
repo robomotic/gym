@@ -138,7 +138,9 @@ class QLearn:
             maxQ = max(q)
 
             if random.random() < self.epsilon:
-                minQ = min(q); mag = max(abs(minQ), abs(maxQ))
+                minQ = min(q);
+                # magnitude as absolute difference between min and max Q
+                mag = max(abs(minQ), abs(maxQ))
                 # add random values to all the actions, recalculate maxQ
                 q = [q[i] + random.random() * mag - .5 * mag for i in range(len(self.actions))]
                 maxQ = max(q)
@@ -166,14 +168,6 @@ class QLearn:
                 prob_t[actionid] = np.exp(qvalue/self.temperature)
 
             prob_t = np.divide(prob_t,sum(prob_t))
-            maxProb = max(prob_t)
-            count = (prob_t == maxProb).sum()
-
-            if count > 1:
-                best = [i for i in range(len(self.actions)) if prob_t[i] == maxProb]
-                i = random.choice(best)
-            else:
-                i = prob_t.argmax()
 
             action = self.weighted_choice(prob_t)
 

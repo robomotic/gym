@@ -181,9 +181,12 @@ class GoldMinerEnv(Env):
             elif self._observation['GoldHostileL'] == 1 and new_position =='HostileL':
                 player_reward = +0.5
                 self._observation['Player%dHasGold' % playernumber] = 1
+                self._observation['GoldHostileL'] = 0
             elif self._observation['GoldHostileR'] == 1 and new_position =='HostileR':
                 player_reward = +0.5
                 self._observation['Player%dHasGold' % playernumber] = 1
+                self._observation['GoldHostileR'] = 0
+
 
         if pos_state =='HostileL' or pos_state =='HostileR':
 
@@ -274,6 +277,7 @@ class GoldMinerEnv(Env):
     def step(self, action):
 
         assert self.action_space.contains(action)
+        self._lastAction = action
 
         self._move_players(action)
 
@@ -308,7 +312,7 @@ class GoldMinerEnv(Env):
         hostile_rxy = (1.0, 1.0)
 
         locations = [home_xy,free_xy,hostile_lxy,hostile_rxy,gold_xy]
-        transitions = [(home_xy,free_xy),(free_xy,hostile_lxy),(free_xy,hostile_rxy),(hostile_rxy,gold_xy),(hostile_lxy,gold_xy)]
+        transitions = [(home_xy,free_xy),(free_xy,hostile_lxy),(free_xy,hostile_rxy),(hostile_rxy,gold_xy),(hostile_lxy,gold_xy),(hostile_lxy,hostile_rxy)]
         red = (1.0,0.0,0.0)
         green = (.0,1.0,.0)
         blue = (.0, .0, 1.0)
@@ -350,14 +354,30 @@ class GoldMinerEnv(Env):
 
             self.viewer.draw_label(text='P1', position=print_xy)
 
-        self.viewer.draw_label(text='Gold Home = %d' % self._observation['GoldHome'], position=(-1.2, -3.5),font_size=14)
+        self.viewer.draw_label(text='Gold Home = %d' % self._observation['GoldHome'], position=(-1.2, -3.4),font_size=12)
+
+        self.viewer.draw_label(text='Player Gold = %d' % self._observation['Player%dHasGold' % 1], position=(-1.2, -3.55),
+                               font_size=12)
+        if self._lastAction:
+            self.viewer.draw_label(text='Player Action = %s' % self.ACTIONS[self._lastAction], position=(-1.2, -3.65),
+                                   font_size=12)
+
+        if self._lastReward:
+            self.viewer.draw_label(text='Reward = %.2f' % self._lastReward, position=(-1.2, -3.9),
+                                   font_size=12)
+
         self.viewer.draw_label(text='Gold Mine = %d' % self._observation['GoldMine'], position=(-1.2,3.5),font_size=14)
+        self.viewer.draw_label(text='Step = %d' % self.steps, position=(1.2, 3.5), font_size=14)
 
-        if self._observation['GoldHostileL']:
+        if self._observation['GoldHostileL']>0:
             self.viewer.draw_label(text='Gold = 1', position=(-1.5, 0.6),font_size=14)
+        else:
+            self.viewer.draw_label(text='Gold = 0', position=(-1.5, 0.6), font_size=14)
 
-        if self._observation['GoldHostileR']:
+        if self._observation['GoldHostileR']>0:
             self.viewer.draw_label(text='Gold = 1', position=(1.5, 0.6),font_size=14)
+        else:
+            self.viewer.draw_label(text='Gold = 0', position=(1.5, 0.6),font_size=14)
 
     def render(self, mode='human'):
 

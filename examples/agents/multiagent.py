@@ -240,7 +240,7 @@ def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
     '''
     folder = os.path.dirname(os.path.realpath(__file__))
     folder = os.path.join(folder, 'parameters')
-    max_steps = 18
+    max_steps = 30
     env = GoldMiner.GoldMinerEnv(players=1, totalgold=1, maxsteps=max_steps)
     if epsgreedy:
         fileparam = os.path.join(folder,'epsgreedy.json')
@@ -278,8 +278,9 @@ def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
     debug_episode = 92
 
     episode_reward = []
+    max_episodes = min(max_episodes,space_size*2)
 
-    for i_episode in range(space_size*2):
+    for i_episode in range(max_episodes):
         observation = monitor.reset()
         # Encode state to a compact string serialization
         state = qlearn.encodeState(observation)
@@ -291,7 +292,10 @@ def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
             print("Episode {:d} ".format(i_episode))
 
         for t in range(max_steps+1):
-
+            if render:
+                monitor.render(mode='rgb_array')
+                fps = env.metadata.get('video.frames_per_second')
+                time.sleep(1.0 / fps)
             # Pick an action based on the current state
             action = qlearn.chooseAction(state)
 
@@ -317,6 +321,7 @@ def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
 
         print("Episode {:d} reward score: {:0.2f}".format(i_episode, cumulated_reward))
 
+    env.close()
     # display simple histogram count
     histogram = Counter(episode_reward)
 
@@ -356,8 +361,11 @@ if __name__ == '__main__':
     logger.set_level(logger.WARN)
 
     if args.best:
-        # Learn with a tabular Q-learning player
-        one_qlearning_player()
+        # Play the policy
+        if args.ui:
+            one_qlearning_player(epsgreedy=args.epson,max_episodes=1,render = args.ui)
+        else:
+            one_qlearning_player(epsgreedy=args.epson)
     elif args.optimize:
         # Parameter search for optimal Q-learning player
         optimize_one_qlearning_player(args.epson)

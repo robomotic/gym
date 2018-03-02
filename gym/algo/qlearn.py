@@ -4,8 +4,9 @@ Basic tabular Q-learning class
 import gym
 import random
 import pandas as pd
+import numpy as np
 class QLearn:
-    def __init__(self, observations, actions, epsilon, alpha, gamma):
+    def __init__(self, observations, actions, epsilon, alpha, gamma ,epsgreedy= True, tstart = 1000):
         '''
         Initialize the Q-learning variables and do some space calculations
         :param gym.spaces.Dict observations: gym space
@@ -13,6 +14,7 @@ class QLearn:
         :param float epsilon: exploration constant
         :param float alpha: discount constant
         :param float gamma: discount factor
+        :param bool epsgreedy: enable eps-greedy policy if True or Softmax is False
         '''
         self.q = {}
         self.epsilon = epsilon  # exploration constant
@@ -20,6 +22,11 @@ class QLearn:
         self.gamma = gamma      # discount factor
         self.total_actions = actions.n  # actions available
         self.actions = range(actions.n) # action indexes
+        self.epsgreedy = epsgreedy
+
+        if self.epsgreedy == False:
+            self.temperature = 1.0 * tstart
+            self.tstep = 1.0
 
         if isinstance(observations,gym.spaces.Dict):
             self.obs_space = {}
@@ -35,6 +42,8 @@ class QLearn:
         else:
             raise Exception("Not implemented yet")
 
+    def setTau(self,tstart):
+        self.temperature = 1.0 * tstart
     def seed(self,seed):
         random.seed(seed)
 
@@ -107,6 +116,15 @@ class QLearn:
         else:
             self.q[(state, action)] = oldv + self.alpha * (value - oldv)
 
+    def weighted_choice(self,weights):
+        # cun sum in ascending order
+        totals = np.cumsum(weights)
+        # this should be 1.0
+        norm = totals[-1]
+        # draw a random number between 0.0 and 1.0
+        draw = np.random.rand() * norm
+        return np.searchsorted(totals, draw)
+
     def chooseAction(self, state, return_q=False):
         '''
         Choose the best action
@@ -115,27 +133,56 @@ class QLearn:
         :return: the action and or the value of the state
         '''
         q = [self.getQ(state, a) for a in self.actions]
-        maxQ = max(q)
 
-        if random.random() < self.epsilon:
-            minQ = min(q); mag = max(abs(minQ), abs(maxQ))
-            # add random values to all the actions, recalculate maxQ
-            q = [q[i] + random.random() * mag - .5 * mag for i in range(len(self.actions))]
+        if self.epsgreedy:
             maxQ = max(q)
 
-        count = q.count(maxQ)
-        # In case there're several state-action max values
-        # we select a random one among them
-        if count > 1:
-            best = [i for i in range(len(self.actions)) if q[i] == maxQ]
-            i = random.choice(best)
-        else:
-            i = q.index(maxQ)
+            if random.random() < self.epsilon:
+                minQ = min(q); mag = max(abs(minQ), abs(maxQ))
+                # add random values to all the actions, recalculate maxQ
+                q = [q[i] + random.random() * mag - .5 * mag for i in range(len(self.actions))]
+                maxQ = max(q)
 
-        action = self.actions[i]
-        if return_q: # if they want it, give it!
-            return action, q
-        return action
+            count = q.count(maxQ)
+            # In case there're several state-action max values
+            # we select a random one among them
+            if count > 1:
+                best = [i for i in range(len(self.actions)) if q[i] == maxQ]
+                i = random.choice(best)
+            else:
+                i = q.index(maxQ)
+
+            action = self.actions[i]
+            if return_q: # if they want it, give it!
+                return action, q
+            return action
+        else:
+            prob_t = np.zeros((len(self.actions),), dtype=float)
+
+            if self.temperature <= 0:
+                self.temperature += self.tstep
+
+            for actionid,qvalue in enumerate(q):
+                prob_t[actionid] = np.exp(qvalue/self.temperature)
+
+            prob_t = np.divide(prob_t,sum(prob_t))
+            maxProb = max(prob_t)
+            count = (prob_t == maxProb).sum()
+
+            if count > 1:
+                best = [i for i in range(len(self.actions)) if prob_t[i] == maxProb]
+                i = random.choice(best)
+            else:
+                i = prob_t.argmax()
+
+            action = self.weighted_choice(prob_t)
+
+            self.temperature -= self.tstep
+
+            if return_q: # if they want it, give it!
+                return action, prob_t
+            else:
+                return action
 
     def learn(self, state1, action1, reward, state2):
         maxqnew = max([self.getQ(state2, a) for a in self.actions])

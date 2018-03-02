@@ -342,6 +342,7 @@ class GoldMinerEnv(Env):
         for id in range(1,self._players+1):
             pos_index = self._observation['Player%dPosition' % id]
             location_xy = locations[pos_index]
+            # TODO: extend to any number of players
             if id == 1:
                 print_xy = (location_xy[0] + 0.2,location_xy[1])
             if id == 2:

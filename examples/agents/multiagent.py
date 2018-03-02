@@ -277,5 +277,5 @@ if __name__ == '__main__':
     elif args.ui:
         test_graphic()
     else:
-        args.print_help()
+        parser.print_help()
         sys.exit(1)

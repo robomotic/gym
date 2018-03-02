@@ -13,6 +13,7 @@ from gym.algo.qlearn import QLearn
 from collections import Counter,deque
 import os
 from PIL import Image
+import json
 
 def test_graphic():
     from gym.envs.classic_control import rendering
@@ -89,7 +90,7 @@ def test_graphic():
     img.save('goldminergame.png')
     img.show()
 
-def evaluate_qlearning(args):
+def evaluate_qlearning_epsgreedy(args):
     index, params = args
     print('Thread {0} Evaluating params: {1}'.format(os.getpid(),params))
 
@@ -139,46 +140,131 @@ def evaluate_qlearning(args):
 
     return score
 
-def optimize_one_qlearning_player():
 
-    grid_params = {
-        'alpha': np.linspace(0.1, 0.5, num=10),
-        'gamma': np.linspace(0.0, 1.0, num=10),
-        'epsilon': np.linspace(0.1, 0.6, num=10)
-    }
+def evaluate_qlearning_softmax(args):
+    index, params = args
+    print('Thread {0} Evaluating params: {1}'.format(os.getpid(),params))
 
+    max_steps = 18
+
+    env = GoldMiner.GoldMinerEnv(players=1,totalgold=1,maxsteps=max_steps)
+
+    # The Q-learn algorithm: alpha is the learning rate, gamma is the discount reward factor and epsilon is the exploration constant
+    qlearn = QLearn(observations=env.observation_space,actions=env.action_space,alpha=params['alpha'], gamma=params['gamma'],epsilon=params['epsilon'], epsgreedy = False)
+    qlearn.setTau(params['taustart'])
+    space_size = qlearn.getObsSize()
+
+    episode_reward = []
+
+    for i_episode in range(space_size*2):
+        observation = env.reset()
+        # Encode state to a compact string serialization
+        state = qlearn.encodeState(observation)
+        cumulated_reward = 0
+        # decay epsilon if necessary
+        qlearn.epsilon = qlearn.epsilon * 1.0
+
+        for t in range(max_steps+1):
+
+            # Pick an action based on the current state
+            action = qlearn.chooseAction(state)
+
+            # Execute the action and get feedback
+            observation, reward, done, info = env.step(action)
+
+            # Encode next state as well
+            nextState = qlearn.encodeState(observation)
+
+            qlearn.learn(state, action, reward, nextState)
+            state = nextState
+            cumulated_reward += reward
+
+            if done:
+                break
+
+        episode_reward.append(cumulated_reward)
+
+    # Close the env and write monitor result info to disk
+    env.close()
+    # With the mean agents that had shorter runs should get a higher score
+    score = np.mean(episode_reward)
+
+    return score
+
+def optimize_one_qlearning_player(epsgreedy=True):
+
+    folder = os.path.dirname(os.path.realpath(__file__))
+    folder = os.path.join(folder,'parameters')
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    if epsgreedy:
+        grid_params = {
+            'alpha': np.linspace(0.1, 0.5, num=10),
+            'gamma': np.linspace(0.0, 1.0, num=10),
+            'epsilon': np.linspace(0.1, 0.6, num=10)
+        }
+    else:
+        grid_params = {
+            'alpha': np.linspace(0.1, 0.5, num=10),
+            'gamma': np.linspace(0.0, 1.0, num=10),
+            'epsilon': np.array([0.0]),
+            'taustart': np.linspace(10, 24, num=14)
+        }
     grid = list(ParameterGrid(grid_params))
 
     start_time = time.time()
     cpu_count = multiprocessing.cpu_count()
     print('About to evaluate {0:d} parameter sets on {1:d} CPU'.format(len(grid),cpu_count))
     pool = multiprocessing.Pool(processes=cpu_count)
-    final_scores = pool.map(evaluate_qlearning, list(enumerate(grid)))
+
+    if epsgreedy:
+        final_scores = pool.map(evaluate_qlearning_epsgreedy, list(enumerate(grid)))
+    else:
+        final_scores = pool.map(evaluate_qlearning_softmax, list(enumerate(grid)))
 
     print('Worse parameter set was {} with score of {}'.format(grid[np.argmin(final_scores)], np.min(final_scores)))
     print('Best parameter set was {} with score of {}'.format(grid[np.argmax(final_scores)], np.max(final_scores)))
+
     print('Execution time: {} sec'.format(time.time() - start_time))
 
-def one_qlearning_player():
+    with open(os.path.join(folder,'epsgreedy.json' if epsgreedy else 'softmax.json'), 'w') as fp:
+        summary = {'best':grid[np.argmax(final_scores)],'score':np.max(final_scores)}
+        json.dump(summary, fp)
+
+
+def one_qlearning_player(epsgreedy=True,max_episodes = 1,render=True):
     '''
-    It uses the parameters found by running optimize_one_qlearning_player
-    Worse parameter set was {'alpha': 0.18888888888888888, 'epsilon': 0.4888888888888888, 'gamma': 0.0} with score of 0.890625
-    Best parameter set was {'alpha': 0.2777777777777778, 'epsilon': 0.2111111111111111, 'gamma': 1.0} with score of 2.040625
-    Execution time: 42.154309034347534 sec
+    Load the best parameters and run the agent
     :return: None
     '''
-
+    folder = os.path.dirname(os.path.realpath(__file__))
+    folder = os.path.join(folder, 'parameters')
     max_steps = 18
+    env = GoldMiner.GoldMinerEnv(players=1, totalgold=1, maxsteps=max_steps)
+    if epsgreedy:
+        fileparam = os.path.join(folder,'epsgreedy.json')
 
-    env = GoldMiner.GoldMinerEnv(players=1,totalgold=1,maxsteps=max_steps)
+        with open(fileparam) as data_file:
+            best = json.load(data_file)['best']
+
+        # The Q-learn algorithm with the epsgreedy exploration
+        qlearn = QLearn(observations=env.observation_space, actions=env.action_space, alpha=best['alpha'], gamma=best['gamma'],
+                        epsilon=best['epsilon'])
+    else:
+        fileparam = os.path.join(folder,'softmax.json')
+
+        with open(fileparam) as data_file:
+            best = json.load(data_file)['best']
+
+        # The Q-learn algorithm with softmax exploration
+        qlearn = QLearn(observations=env.observation_space, actions=env.action_space, alpha=best['alpha'], gamma=best['gamma'],
+                        epsilon=best['epsilon'])
 
     outdir = '../multiagent/one-qlearn'
     monitor = wrappers.Monitor(env, directory=outdir, force=True)
 
     last_time_steps = np.ndarray(0)
-
-    # The Q-learn algorithm: alpha is the learning rate, gamma is the discount reward factor and epsilon is the exploration constant
-    qlearn = QLearn(observations=env.observation_space,actions=env.action_space,alpha=0.27, gamma=1.0, epsilon=0.21)
 
     # make deterministic both environment and agent
     env.seed(0)
@@ -261,6 +347,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=None)
     parser.add_argument('--optimize', dest='optimize', action='store_true')
     parser.add_argument('--best', dest='best', action='store_true',default = False)
+    parser.add_argument('--epsgreedy', dest='epson', action='store_true', default=False)
     parser.add_argument('--grafix', dest='ui', action='store_true', default = False)
     args = parser.parse_args()
 
@@ -273,7 +360,7 @@ if __name__ == '__main__':
         one_qlearning_player()
     elif args.optimize:
         # Parameter search for optimal Q-learning player
-        optimize_one_qlearning_player()
+        optimize_one_qlearning_player(args.epson)
     elif args.ui:
         test_graphic()
     else:

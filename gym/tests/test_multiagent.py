@@ -229,6 +229,6 @@ class TestMultiPlayer(object):
         min_rewards = min(min(episode_reward1),min(episode_reward2))
         assert max_rewards <= 2.0
         assert min_rewards >= -1.0
-
+        envmonitor.env.close()
         envmonitor.close()
 
